@@ -1,9 +1,16 @@
 import streamlit as st
 import pandas as pd
-import os
 
-st.title("Calcula tu Rentabilidad Comercial📈")
+st.title("Simulador de Rentabilidad Comercial 📈")
 st.write("---")
+
+# 1. CREACIÓN DE LA PIZARRA MÁGICA (Memoria individual)
+# Si el usuario es nuevo, le creamos un historial vacío en su sesión
+if "historial" not in st.session_state:
+    # Creamos una tabla de Pandas vacía con los títulos de las columnas
+    st.session_state["historial"] = pd.DataFrame(columns=[
+        "Producto", "Precio Venta", "Costo", "Meta Ads", "Ganancia Neta"
+    ])
 
 st.header("1. Ingresa tus números")
 nombre_producto = st.text_input("Nombre del producto o campaña:")
@@ -38,14 +45,14 @@ tabla_datos = pd.DataFrame({
 st.bar_chart(tabla_datos, x="Conceptos", y="Soles (S/)")
 
 st.write("---")
-st.header("5. Historial de Productos")
+st.header("5. Historial de Productos (Privado)")
 
-# Botón para guardar en el sistema interno
-if st.button("💾 Guardar cálculo internamente"):
+# 2. GUARDAR EN LA PIZARRA
+if st.button("💾 Guardar cálculo en mi sesión"):
     if nombre_producto == "":
         st.error("Por favor, escribe el nombre del producto arriba antes de guardar.")
     else:
-    # Creamos una fila con el resumen de este producto (AHORA REDONDEADO)
+        # Creamos la fila con los datos redondeados
         nuevo_registro = pd.DataFrame({
             "Producto": [nombre_producto],
             "Precio Venta": [round(precio_venta, 2)],
@@ -53,20 +60,26 @@ if st.button("💾 Guardar cálculo internamente"):
             "Meta Ads": [round(costo_ads, 2)],
             "Ganancia Neta": [round(ganancia_neta, 2)]
         })
-        archivo_existe = os.path.isfile("registro_productos.csv")
-        nuevo_registro.to_csv("registro_productos.csv", mode='a', header=not archivo_existe, index=False, sep=';', decimal=',')
-        st.success(f"¡El producto '{nombre_producto}' ha sido guardado exitosamente!")
+        
+        # Pegamos la nueva fila a la tabla que está en la memoria del usuario usando pd.concat
+        st.session_state["historial"] = pd.concat([st.session_state["historial"], nuevo_registro], ignore_index=True)
+        
+        st.success(f"¡El producto '{nombre_producto}' ha sido guardado temporalmente en tu sesión!")
 
 st.write("---")
-# NUEVO: Verificamos si el archivo existe en la computadora
-if os.path.isfile("registro_productos.csv"):
-    st.write("¿Quieres llevarte tu base de datos? Descárgala aquí:")
+
+# 3. DESCARGAR DESDE LA PIZARRA
+# Si la tabla en la memoria ya no está vacía (es decir, si ya guardó al menos un producto)
+if not st.session_state["historial"].empty:
+    st.write("Tus datos están listos y seguros. Descárgalos aquí:")
     
-    # Leemos el archivo y creamos el botón de descarga web
-    with open("registro_productos.csv", "rb") as file:
-        st.download_button(
-            label="📥 Descargar mi base de datos (Excel/CSV)",
-            data=file,
-            file_name="historial_mi_empresa.csv",
-            mime="text/csv"
-        )
+    # Convertimos la tabla de la memoria a formato CSV con punto y coma (para Excel en español)
+    csv_seguro = st.session_state["historial"].to_csv(index=False, sep=';', decimal=',')
+    
+    # Creamos el botón de descarga
+    st.download_button(
+        label="📥 Descargar mi base de datos (Excel)",
+        data=csv_seguro,
+        file_name="reporte_privado_rentabilidad.csv",
+        mime="text/csv"
+    )
